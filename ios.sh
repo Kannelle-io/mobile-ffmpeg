@@ -778,6 +778,33 @@ create_external_library_package() {
 
             ${LIPO_COMMAND} 1>>"${BASEDIR}/build.log" 2>&1
           fi
+        elif [[ ${TARGET_ARCH} = "arm64" ]]; then
+          local PREBUILT_ARMV7_FAT_STATIC_LIBRARY_PATH=$(find ${BASEDIR}/prebuilt-4.4-lts/$2.framework -name $2)
+
+          echo -e "PREBUILT_ARMV7_FAT_STATIC_LIBRARY_PATH = $PREBUILT_ARMV7_FAT_STATIC_LIBRARY_PATH\n" 1>>"${BASEDIR}/build.log" 2>&1
+          if [ -f "$PREBUILT_ARMV7_FAT_STATIC_LIBRARY_PATH" ]; then
+            echo "$PREBUILT_ARMV7_FAT_STATIC_LIBRARY_PATH exists. => merge prebuilt armv7 with arm64 library\n" 1>>"${BASEDIR}/build.log" 2>&1
+
+            local FRAMEWORK_PATH=${BASEDIR}/prebuilt/ios-xcframework/.tmp/ios-armv7_arm64/$2.framework
+            mkdir -p "${FRAMEWORK_PATH}" 1>>"${BASEDIR}/build.log" 2>&1 || exit 1
+
+            local PREBUILT_ARMV7_SLIM_STATIC_LIBRARY_PATH=${BASEDIR}/prebuilt-4.4-lts/$2.framework/$2-armv7.a
+            LIPO_COMMAND="${LIPO} -thin armv7 $PREBUILT_ARMV7_FAT_STATIC_LIBRARY_PATH -output $PREBUILT_ARMV7_SLIM_STATIC_LIBRARY_PATH"
+            
+            ${LIPO_COMMAND} 1>>"${BASEDIR}/build.log" 2>&1
+            
+
+            build_info_plist "${FRAMEWORK_PATH}/Info.plist" "$2" "com.arthenica.mobileffmpeg.${CAPITAL_CASE_LIBRARY_NAME}" "$4" "$4"
+            #cp "${STATIC_LIBRARY_PATH}" "${FRAMEWORK_PATH}/$2" 1>>"${BASEDIR}/build.log" 2>&1
+
+            LIPO_COMMAND="${LIPO} -create $PREBUILT_ARMV7_SLIM_STATIC_LIBRARY_PATH $STATIC_LIBRARY_PATH"
+            
+            LIPO_COMMAND+=" -output ${FRAMEWORK_PATH}/$2"
+
+            echo "Will run lipo command: ${LIPO_COMMAND}" 1>>"${BASEDIR}/build.log" 2>&1
+
+            ${LIPO_COMMAND} 1>>"${BASEDIR}/build.log" 2>&1
+          fi
         fi
       fi
     done
@@ -791,6 +818,9 @@ create_external_library_package() {
     local ARM64_X86_64_SIMULATOR_FRAMEWORK_PATH=${BASEDIR}/prebuilt/ios-xcframework/.tmp/ios-arm64_x86_64-simulator/$2.framework
     local ARM64_X86_64_SIMULATOR_PATH=${ARM64_X86_64_SIMULATOR_FRAMEWORK_PATH}/$2
 
+    local ARMV7_ARM64_FRAMEWORK_PATH=${BASEDIR}/prebuilt/ios-xcframework/.tmp/ios-armv7_arm64/$2.framework
+    local ARMV7_ARM64_PATH=${ARMV7_ARM64_FRAMEWORK_PATH}/$2
+
     for TARGET_ARCH in "${TARGET_ARCH_LIST[@]}"; do
       if [[ ${TARGET_ARCH} != "arm64e" ]]; then
         local FRAMEWORK_PATH=${BASEDIR}/prebuilt/ios-xcframework/.tmp/ios-${TARGET_ARCH}/$2.framework
@@ -798,6 +828,12 @@ create_external_library_package() {
           if [ ! -f "$ARM64_X86_64_SIMULATOR_PATH" ]; then
             echo "arm64_x86_64-simulator not found at ${ARM64_X86_64_SIMULATOR_PATH}" 1>>"${BASEDIR}/build.log" 2>&1
             echo "... add arm64-simulator instead\n" 1>>"${BASEDIR}/build.log" 2>&1
+            BUILD_COMMAND+=" -framework ${FRAMEWORK_PATH}"
+          fi
+        elif [[ ${TARGET_ARCH} = "arm64" ]]; then
+          if [ ! -f "$ARMV7_ARM64_PATH" ]; then
+            echo "armv7_arm64-simulator not found at ${ARMV7_ARM64_PATH}" 1>>"${BASEDIR}/build.log" 2>&1
+            echo "... add arm64 instead\n" 1>>"${BASEDIR}/build.log" 2>&1
             BUILD_COMMAND+=" -framework ${FRAMEWORK_PATH}"
           fi
         else
@@ -817,6 +853,10 @@ create_external_library_package() {
 
     if [ -f "$ARM64_X86_64_SIMULATOR_PATH" ]; then
       BUILD_COMMAND+=" -framework ${ARM64_X86_64_SIMULATOR_FRAMEWORK_PATH}"
+    fi
+
+    if [ -f "$ARMV7_ARM64_PATH" ]; then
+      BUILD_COMMAND+=" -framework ${ARMV7_ARM64_FRAMEWORK_PATH}"
     fi
 
     BUILD_COMMAND+=" -output ${XCFRAMEWORK_PATH}"
@@ -1413,6 +1453,49 @@ if [[ -n ${TARGET_ARCH_LIST[0]} ]]; then
             else
               BUILD_COMMAND+=" -framework ${FFMPEG_LIB_FRAMEWORK_PATH}"
             fi
+          elif [[ "${TARGET_ARCH}" == "arm64" ]]; then
+
+            PREBUILT_ARMV7_FAT_FRAMEWORK_BINARY_PATH="${BASEDIR}/prebuilt-4.4-lts/${FFMPEG_LIB}.framework/${FFMPEG_LIB}"
+            PREBUILT_ARMV7_SLIM_FRAMEWORK_BINARY_PATH="${BASEDIR}/prebuilt-4.4-lts/${FFMPEG_LIB}.framework/${FFMPEG_LIB}-armv7.a"
+            if [ -f "$PREBUILT_ARMV7_FAT_FRAMEWORK_BINARY_PATH" ]; then
+              LIPO_COMMAND="${LIPO} -thin armv7 ${PREBUILT_ARMV7_FAT_FRAMEWORK_BINARY_PATH}"
+              LIPO_COMMAND+=" -output ${PREBUILT_ARMV7_SLIM_FRAMEWORK_BINARY_PATH}"
+              COMMAND_OUTPUT=$(${LIPO_COMMAND} 2>&1)
+            fi
+            
+            echo "Creating fat package for armv7_arm64. Check if $PREBUILT_ARMV7_SLIM_FRAMEWORK_BINARY_PATH exists..." 1>>"${BASEDIR}/build.log" 2>&1
+            if [ -f "$PREBUILT_ARMV7_SLIM_FRAMEWORK_BINARY_PATH" ]; then
+
+              FFMPEG_LIB_FRAMEWORK_PATH=${BASEDIR}/prebuilt/ios-xcframework/.tmp/ios-armv7_arm64/${FFMPEG_LIB}.framework
+
+              rm -rf "${FFMPEG_LIB_FRAMEWORK_PATH}" 1>>"${BASEDIR}/build.log" 2>&1
+              mkdir -p "${FFMPEG_LIB_FRAMEWORK_PATH}/Headers" 1>>"${BASEDIR}/build.log" 2>&1 || exit 1
+
+              cp -r ${BASEDIR}/prebuilt/ios-${TARGET_ARCH}/ffmpeg/include/${FFMPEG_LIB}/* ${FFMPEG_LIB_FRAMEWORK_PATH}/Headers 1>>"${BASEDIR}/build.log" 2>&1
+
+              LIPO_COMMAND="${LIPO} -create ${PREBUILT_ARMV7_SLIM_FRAMEWORK_BINARY_PATH} ${BASEDIR}/prebuilt/ios-${TARGET_ARCH}/ffmpeg/lib/${FFMPEG_LIB}.${BUILD_LIBRARY_EXTENSION}"
+
+              LIPO_COMMAND+=" -output ${FFMPEG_LIB_FRAMEWORK_PATH}/${FFMPEG_LIB}"
+              
+              ${LIPO_COMMAND} 1>>"${BASEDIR}/build.log" 2>&1
+
+              # COPY THE LICENSES
+              if [ ${GPL_ENABLED} == "yes" ]; then
+
+                # GPLv3.0
+                cp "${BASEDIR}/LICENSE.GPLv3" "${FFMPEG_LIB_FRAMEWORK_PATH}/LICENSE" 1>>"${BASEDIR}/build.log" 2>&1
+              else
+
+                # LGPLv3.0
+                cp "${BASEDIR}/LICENSE.LGPLv3" "${FFMPEG_LIB_FRAMEWORK_PATH}/LICENSE" 1>>"${BASEDIR}/build.log" 2>&1
+              fi
+
+              build_info_plist "${FFMPEG_LIB_FRAMEWORK_PATH}/Info.plist" "${FFMPEG_LIB}" "com.arthenica.mobileffmpeg.${FFMPEG_LIB_CAPITALCASE}" "${FFMPEG_LIB_VERSION}" "${FFMPEG_LIB_VERSION}"
+
+              BUILD_COMMAND+=" -framework ${FFMPEG_LIB_FRAMEWORK_PATH}"
+            else
+              BUILD_COMMAND+=" -framework ${FFMPEG_LIB_FRAMEWORK_PATH}"
+            fi
           else
             if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
               ARM64_SIMULATOR_STATIC_LIBRARY_PATH="${BASEDIR}/prebuilt/ios-arm64-simulator/ffmpeg/lib/${FFMPEG_LIB}.${BUILD_LIBRARY_EXTENSION}"
@@ -1503,6 +1586,47 @@ if [[ -n ${TARGET_ARCH_LIST[0]} ]]; then
           else
             BUILD_COMMAND+=" -framework ${MOBILE_FFMPEG_FRAMEWORK_PATH}"
           fi
+        elif [[ "${TARGET_ARCH}" == "arm64" ]]; then
+
+          PREBUILT_ARMV7_FAT_FRAMEWORK_BINARY_PATH="${BASEDIR}/prebuilt-4.4-lts/mobileffmpeg.framework/mobileffmpeg"
+          PREBUILT_ARMV7_SLIM_FRAMEWORK_BINARY_PATH="${BASEDIR}/prebuilt-4.4-lts/mobileffmpeg.framework/mobileffmpeg-armv7.a"
+          if [ -f "$PREBUILT_ARMV7_FAT_FRAMEWORK_BINARY_PATH" ]; then
+            LIPO_COMMAND="${LIPO} -thin armv7 ${PREBUILT_ARMV7_FAT_FRAMEWORK_BINARY_PATH}"
+            LIPO_COMMAND+=" -output ${PREBUILT_ARMV7_SLIM_FRAMEWORK_BINARY_PATH}"
+            COMMAND_OUTPUT=$(${LIPO_COMMAND} 2>&1)
+          fi
+
+          #X86_64_STATIC_LIBRARY_PATH="${BASEDIR}/prebuilt/ios-x86_64/mobile-ffmpeg/lib/libmobileffmpeg.${BUILD_LIBRARY_EXTENSION}"
+          echo "Creating mobileffmpeg fat package for armv7_arm64. Check if $PREBUILT_ARMV7_SLIM_FRAMEWORK_BINARY_PATH exists..." 1>>"${BASEDIR}/build.log" 2>&1
+          if [ -f "$PREBUILT_ARMV7_SLIM_FRAMEWORK_BINARY_PATH" ]; then
+            MOBILE_FFMPEG_FRAMEWORK_PATH="${BASEDIR}/prebuilt/ios-xcframework/.tmp/ios-armv7_arm64/mobileffmpeg.framework"
+
+            rm -rf "${MOBILE_FFMPEG_FRAMEWORK_PATH}" 1>>"${BASEDIR}/build.log" 2>&1
+            mkdir -p "${MOBILE_FFMPEG_FRAMEWORK_PATH}/Headers" 1>>"${BASEDIR}/build.log" 2>&1 || exit 1
+            mkdir -p "${MOBILE_FFMPEG_FRAMEWORK_PATH}/Modules" 1>>"${BASEDIR}/build.log" 2>&1 || exit 1
+            build_modulemap "${MOBILE_FFMPEG_FRAMEWORK_PATH}/Modules/module.modulemap"
+
+            cp -r ${BASEDIR}/prebuilt/ios-${TARGET_ARCH}/mobile-ffmpeg/include/* ${MOBILE_FFMPEG_FRAMEWORK_PATH}/Headers 1>>"${BASEDIR}/build.log" 2>&1
+            
+            
+            LIPO_COMMAND="${LIPO} -create ${PREBUILT_ARMV7_SLIM_FRAMEWORK_BINARY_PATH} ${BASEDIR}/prebuilt/ios-${TARGET_ARCH}/mobile-ffmpeg/lib/libmobileffmpeg.${BUILD_LIBRARY_EXTENSION}"
+
+            LIPO_COMMAND+=" -output ${MOBILE_FFMPEG_FRAMEWORK_PATH}/mobileffmpeg"
+            
+            ${LIPO_COMMAND} 1>>"${BASEDIR}/build.log" 2>&1
+
+            # COPY THE LICENSES
+            if [ ${GPL_ENABLED} == "yes" ]; then
+              cp "${BASEDIR}/LICENSE.GPLv3" "${MOBILE_FFMPEG_FRAMEWORK_PATH}/LICENSE" 1>>"${BASEDIR}/build.log" 2>&1
+            else
+              cp "${BASEDIR}/LICENSE.LGPLv3" "${MOBILE_FFMPEG_FRAMEWORK_PATH}/LICENSE" 1>>"${BASEDIR}/build.log" 2>&1
+            fi
+            BUILD_COMMAND+=" -framework ${MOBILE_FFMPEG_FRAMEWORK_PATH}"
+          else
+            BUILD_COMMAND+=" -framework ${MOBILE_FFMPEG_FRAMEWORK_PATH}"
+          fi
+
+
         else
           if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
             ARM64_SIMULATOR_STATIC_LIBRARY_PATH="${BASEDIR}/prebuilt/ios-arm64-simulator/mobile-ffmpeg/lib/libmobileffmpeg.${BUILD_LIBRARY_EXTENSION}"

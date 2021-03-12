@@ -170,7 +170,7 @@ AUTOMAKE = ${SHELL} '/Users/fred/kannelle/tools/mobile-ffmpeg/src/libwebp/missin
 AWK = awk
 CC = clang
 CCDEPMODE = depmode=none
-CFLAGS = -arch arm64 -target aarch64-ios-darwin -march=armv8-a+crc+crypto -mcpu=generic -DMOBILE_FFMPEG_ARM64 -fno-common -DPIC -fstrict-aliasing -DIOS -DMOBILE_FFMPEG_BUILD_DATE=20210308 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator14.4.sdk -O2 -Wno-ignored-optimization-argument -mios-simulator-version-min=12.1 -I/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator14.4.sdk/usr/include -D_THREAD_SAFE -pthread
+CFLAGS = -arch arm64 -target aarch64-ios-darwin -march=armv8-a+crc+crypto -mcpu=generic -DMOBILE_FFMPEG_ARM64 -fno-common -DPIC -fstrict-aliasing -DIOS -DMOBILE_FFMPEG_BUILD_DATE=20210311 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator14.4.sdk -O2 -Wno-ignored-optimization-argument -mios-simulator-version-min=12.1 -I/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator14.4.sdk/usr/include -D_THREAD_SAFE -pthread
 CPP = clang -E
 CPPFLAGS = 
 CYGPATH_W = echo
